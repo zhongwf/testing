@@ -20,10 +20,11 @@ var s_testCases;
 var s_grades;
 var url = "http://test.zhjw.syx.thcic.cn:21122/";
 var saveFilePath = "C:\\Users\\zhong\\Desktop\\screen\\"; 
-
+var executeTime=1;
 var testUsers = [
 /*
 {xh : "2009980013",xslx : "yx",sfxs : "yes"}//院系
+
 //, {xh : "1985990089",xslx : "yx",sfxs : "yes"} //院系
 
 
@@ -33,12 +34,13 @@ var testUsers = [
 */
 
 
- /* */
+
  {
 	xh : "2015010245",
 	xslx : "bks",
 	sfxs : "是"
 }
+
  ,
 
  {
@@ -87,16 +89,27 @@ var testUsers = [
 	xh : "2014310401",
 	xslx : "bs",
 	sfxs : "否"
-}
+}/*
 ,{xh : "2015400536",xslx : "jxs",sfxs : "是"} //进修生
-
+ */
 
  ];
 
 
+var folder_exists = fs.existsSync(saveFilePath);
+if(folder_exists == true)
+{
+     var dirList = fs.readdirSync(saveFilePath);
+    dirList.forEach(function(fileName)
+     {
+   	 console.log("del......" + saveFilePath + fileName);
+        fs.unlinkSync(saveFilePath + fileName);
+   });
+}
+
 	
 	request.get({
-		url : "http://166.111.5.112:21122/tools/oracle.jsp",
+		url : "http://test.zhjw.syx.thcic.cn:21122/tools/oracle.jsp?act=on",
 		json : true
 	}, function(e, r, gs) {
 		console.log(gs);
@@ -159,16 +172,7 @@ function start() {
 		driver.sleep(loginSleepTime);
 	}
 	
-	var folder_exists = fs.existsSync(saveFilePath);
-	 if(folder_exists == true)
-	 {
-	      var dirList = fs.readdirSync(saveFilePath);
-	     dirList.forEach(function(fileName)
-	      {
-	    	 console.log("del......" + saveFilePath + fileName);
-	         fs.unlinkSync(saveFilePath + fileName);
-	    });
-	 }
+
 
 	for ( var testUsersIdx in testUsers) {
 		var testUser = testUsers[testUsersIdx];
@@ -199,7 +203,7 @@ function start() {
 				displayText[displayText.length] = studentType + testUser.xh + "-"+ testCase.title;
 				driver.takeScreenshot(1).then(
 						function(data) {
-							
+							console.log("takeScreenshot....");
 							var base64Data = data.replace(
 									/^data:image\/png;base64,/, "")
 							// + testUser.xh + "-" + screenNumName + "-"
@@ -234,6 +238,81 @@ function start() {
 
 	}
 	console.log("finish");
-	driver.quit(); 
+	driver.quit().then(
+			function() {
+				console.log("real finish....");
+				if(executeTime == 1){
+					executeTime = 2;
+					request.get({
+						url : "http://test.zhjw.syx.thcic.cn:21122/tools/oracle.jsp?act=off",
+						json : true
+					}, function(e, r, gs) {
+						console.log(gs);
+						if(gs.result == 'on'){ 
+							currentCxkg = "开";
+						//	currentCxkg = "ON";
+						}else if(gs.result == 'off'){
+							currentCxkg = "关";
+						//	currentCxkg = "OFF"; 
+						}
+						console.log("currentCxkg:" +currentCxkg);
+
+						request.get({
+							url : data_url + "/grade/",
+							json : true,
+							"encoding" : "utf-8"
+						}, function(e, r, gs) {
+							s_grades = gs;
+							request.get({
+								url : data_url + "/testCase/?sort=xh%20ASC",
+								json : true,
+								"encoding" : "utf-8"
+							}, function(e, r, testCases) {
+								s_testCases = testCases;
+								driver.sleep(10000);
+								start();
+							});
+
+						});
+						
+					});
+					
+				}else{
+					request.get({
+						url : "http://test.zhjw.syx.thcic.cn:21122/tools/oracle.jsp?act=on",
+						json : true
+					});
+					
+					var fs = require("fs");
+					var zip = require("node-native-zip");
+					var path = require("path");
+					//要压缩文件夹所在的父目录
+					var pathToZipDir = 'C:\\Users\\zhong\\Desktop';
+					//要压缩文件夹所在的最后一层目录
+					var dirToZip = 'screen';
+					(function () {
+					    var zip = require("node-native-zip");
+					    
+					    var archive = new zip();
+					    (function addFile(filepath) {
+					        if(fs.lstatSync(filepath).isDirectory()) {
+					            var directory = fs.readdirSync(filepath);
+					            directory.forEach(function(subfilepath) {
+					                addFile(path.join(filepath,subfilepath));
+					            });
+					        } else {
+					            archive.add(path.relative(pathToZipDir, filepath), fs.readFileSync(filepath, 'binary'));
+					        }
+					    })(path.join(pathToZipDir, dirToZip));
+					    var buff = archive.toBuffer();
+					        
+					    fs.writeFile("C:\\Users\\zhong\\Desktop\\"+dirToZip+".zip", buff, function () {
+					        console.log("im finished");
+					    });
+					}())
+				}
+			}
+	);
+	 
 
 }
